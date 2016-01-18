@@ -1,61 +1,56 @@
-define [
-  'lib/art/foundation'
-  'lib/art/flux/core'
-  './parse_util'
-], (Foundation, FluxCore, ParseUtil) ->
-  {BaseObject, present} = Foundation
+{BaseObject, present} = require 'art.foundation'
 
-  {FluxStore, FluxModel} = FluxCore
-  {fluxStore} = FluxStore
+Flux = require './flux'
+{FluxModel} = Flux.Core
 
-  {saveParseObject, parseCallbackHandlers, parseToFluxRecord, parseToPlainObject} = ParseUtil
+{saveParseObject, parseCallbackHandlers, parseToFluxRecord, parseToPlainObject} = require './parse_util'
 
-  class ParseCurrentUser extends FluxModel
-    # @register()
+module.exports = class ParseCurrentUser extends FluxModel
+  # @register()
 
-    toFluxKey: (key) -> "current"
+  toFluxKey: (key) -> "current"
 
-    loadWithPromise: ->
+  loadWithPromise: ->
 
-    load: ->
+  load: ->
+    @reload()
+    parseToFluxRecord @_currentUser
+    null
+
+  reload: ->
+    Parse.User.currentAsync()
+    .then (currentUser) -> currentUser?.fetch()
+    .then (@_currentUser) =>
+      @updateFluxStore @toFluxKey(), parseToFluxRecord @_currentUser
+      @_currentUser
+    , ({code, message}) =>
+      log errorFetchingCurrentUser: code:code, message:message, INVALID_SESSION_TOKEN:Parse.Error.INVALID_SESSION_TOKEN
+      if code == Parse.Error.INVALID_SESSION_TOKEN
+        log "CurrentUser: INVALID_SESSION_TOKEN detected - logging out"
+        Parse.User.logOut()
+
+  @getter
+    currentUser:       -> parseToPlainObject @_currentUser
+    currentUserId:     -> @_currentUser?.id
+
+  signUp: (userRecord, callback)->
+
+    user = new Parse.User()
+    user.set k, v for k, v of userRecord
+
+    user.signUp null, parseCallbackHandlers null, (fluxRecord) =>
       @reload()
-      parseToFluxRecord @_currentUser
-      null
+      callback? fluxRecord
 
-    reload: ->
-      Parse.User.currentAsync()
-      .then (currentUser) -> currentUser?.fetch()
-      .then (@_currentUser) =>
-        @updateFluxStore @toFluxKey(), parseToFluxRecord @_currentUser
-        @_currentUser
-      , ({code, message}) =>
-        log errorFetchingCurrentUser: code:code, message:message, INVALID_SESSION_TOKEN:Parse.Error.INVALID_SESSION_TOKEN
-        if code == Parse.Error.INVALID_SESSION_TOKEN
-          log "CurrentUser: INVALID_SESSION_TOKEN detected - logging out"
-          Parse.User.logOut()
+  logIn: (userRecord, callback) ->
+    {username, password} = userRecord
 
-    @getter
-      currentUser:       -> parseToPlainObject @_currentUser
-      currentUserId:     -> @_currentUser?.id
+    @log logIn:username:username, passwordPresent: present password # DONT ACTUALLY LOG THE PASSWORD!
 
-    signUp: (userRecord, callback)->
-
-      user = new Parse.User()
-      user.set k, v for k, v of userRecord
-
-      user.signUp null, parseCallbackHandlers null, (fluxRecord) =>
-        @reload()
-        callback? fluxRecord
-
-    logIn: (userRecord, callback) ->
-      {username, password} = userRecord
-
-      @log logIn:username:username, passwordPresent: present password # DONT ACTUALLY LOG THE PASSWORD!
-
-      Parse.User.logIn username, password, parseCallbackHandlers null, (fluxRecord) =>
-        @reload()
-        callback? fluxRecord
-
-    logOut: ->
-      Parse.User.logOut()
+    Parse.User.logIn username, password, parseCallbackHandlers null, (fluxRecord) =>
       @reload()
+      callback? fluxRecord
+
+  logOut: ->
+    Parse.User.logOut()
+    @reload()

@@ -6,7 +6,8 @@
   "dependencies": {
     "coffee-loader": "^0.7.2",
     "neptune-namespaces": "^0.0.1",
-    "art.foundation": "^0.0.1"
+    "art.foundation": "^0.0.1",
+    "art.flux": "^0.0.1"
   },
   "devDependencies": {
     "mocha": "^2.3.4",
