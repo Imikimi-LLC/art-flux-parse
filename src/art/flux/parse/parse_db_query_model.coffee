@@ -2,7 +2,7 @@
   log, BaseObject, decapitalize, pluralize, pureMerge, shallowClone, isString,
   merge
   emailRegexp, urlRegexp, isNumber, nextTick, capitalize, inspect, isFunction, objectWithout, present, globalCount, time
-} = require 'art.foundation'
+} = require 'art-foundation'
 
 Flux = require './flux'
 {FluxDbQueryModel} = Flux.Db

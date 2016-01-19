@@ -1,10 +1,10 @@
 {
-  "name": "art.flux.parse",
+  "name": "art-flux-parse",
   "version": "0.0.1",
-  "description": "art.flux.parse",
+  "description": "art-flux-parse",
   "main": "index.coffee",
   "dependencies": {
-    "art.flux": "git://github.com/Imikimi-LLC/art.flux.git"
+    "art-flux": "git://github.com/Imikimi-LLC/art-flux-git"
   },
   "devDependencies": {
   },

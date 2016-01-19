@@ -4,7 +4,7 @@
   flatten, compact
   consistentJsonStringify
   inspectLean
-} = require 'art.foundation'
+} = require 'art-foundation'
 
 ParseDbModel = require './parse_db_model'
 ParseDbQueryModel = require './parse_db_query_model'
