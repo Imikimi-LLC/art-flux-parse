@@ -4,7 +4,9 @@
   "description": "art-flux-parse",
   "main": "index.coffee",
   "dependencies": {
-    "art-flux": "git://github.com/Imikimi-LLC/art-flux-git"
+    "art-flux": "git://github.com/Imikimi-LLC/art-flux-git",
+    "parse": "^1.6.14",
+    "pusher": "^1.1.0"
   },
   "devDependencies": {
   },

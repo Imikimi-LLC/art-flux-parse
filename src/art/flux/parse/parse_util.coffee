@@ -1,6 +1,7 @@
 {
   BaseObject, log, peek, isArray, objectWithout
 } = require 'art-foundation'
+Parse = require 'parse'
 
 # NOTE: To use this model, be sure to include the Parse client library such that "Parse" available globally.
 module.exports = class ParseUtil extends BaseObject

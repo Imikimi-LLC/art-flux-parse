@@ -1,4 +1,5 @@
 {BaseObject, present} = require 'art-foundation'
+Parse = require 'parse'
 
 Flux = require './flux'
 {FluxModel} = Flux.Core

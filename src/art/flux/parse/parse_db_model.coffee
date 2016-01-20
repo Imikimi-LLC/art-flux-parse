@@ -2,6 +2,7 @@
   BaseObject, mergeInfo, log, clone, slice, merge, arrayWithOne, peek
   inspect, isArray, isString, objectWithout, globalCount, time
 } = require 'art-foundation'
+Parse = require 'parse'
 
 Flux = require './flux'
 {FluxDbModel} = Flux.Db
