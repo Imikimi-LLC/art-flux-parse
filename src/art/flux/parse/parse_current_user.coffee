@@ -34,6 +34,8 @@ module.exports = class ParseCurrentUser extends FluxModel
     currentUser:       -> parseToPlainObject @_currentUser
     currentUserId:     -> @_currentUser?.id
 
+  get: -> parseToPlainObject @_currentUser
+
   signUp: (userRecord, callback)->
 
     user = new Parse.User()
