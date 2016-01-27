@@ -1,4 +1,4 @@
-{BaseObject, present} = require 'art-foundation'
+{BaseObject, present, log} = require 'art-foundation'
 Parse = require 'parse'
 
 Flux = require './flux'
