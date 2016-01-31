@@ -47,7 +47,12 @@ class PusherLink extends BaseObject
     @_openPusherChannels = {}
     @_pusherChannelListeners = {}
 
-    console.log "@addDependency " + inspectLean model:model.singlesModel.name, name: model.name, keyFromData: "(" + model.keyFromData.toString().replace(/\s+/g, " ") + ")"
+    # console.log @dependencyCode
+
+  @getter
+    dependencyCode: ->
+      model = @_model
+      "@addDependency " + inspectLean model:model.singlesModel.name, name: model.name, keyFromData: "(" + model.keyFromData.toString().replace(/\s+/g, " ") + ")"
 
   fluxStoreEntryUpdated: ({key}) ->
     return unless self.pusher
