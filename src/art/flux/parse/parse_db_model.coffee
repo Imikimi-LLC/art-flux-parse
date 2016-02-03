@@ -7,7 +7,7 @@ Parse = require 'parse'
 Flux = require './flux'
 {FluxDbModel} = Flux.Db
 
-{saveParseObject, parseCallbackHandlers} = require './parse_util'
+{parseErrorToStatusCode} = require './parse_util'
 ParseDbQueryModel = require './parse_db_query_model'
 
 ###
@@ -36,12 +36,14 @@ Stopwords in many languages: http://www.ranks.nl/stopwords
 
 # NOTE: To use this model, be sure to include the Parse client library such that "Parse" available globally.
 module.exports = class ParseDbModel extends FluxDbModel
+  @parseClassNameToModelName: {}
   @singletonClass()
   @queryModel: ParseDbQueryModel
 
   constructor: ->
     super
     @ObjectClass = Parse.Object.extend @parseObjectName = @class.name
+    ParseDbModel.parseClassNameToModelName[@ObjectClass.className] = @name
 
   @getter
     newPlainQuery: -> new Parse.Query @ObjectClass
@@ -51,7 +53,6 @@ module.exports = class ParseDbModel extends FluxDbModel
     ret = new @ObjectClass
     ret.id = objectId
     ret
-
 
   # returns a promise AND supports the flux callback
   # NOTE: Parse.Promises don't support "progress". How do we want to support that?
@@ -79,6 +80,14 @@ module.exports = class ParseDbModel extends FluxDbModel
         else promise.reject fluxRecord
 
     promise
+
+  ##########################
+  # Overrides
+  ##########################
+
+  # override this to post-process every instance of this record-type retrieved from parse.
+  # useful for when you are renaming fields or need computed fields
+  postProcessRecord: (record) -> record
 
   ##########################
   # private
@@ -154,7 +163,7 @@ module.exports = class ParseDbModel extends FluxDbModel
       log fluxRecord
 
   # used for debugging
-  logRecord: (id) ->
+  _logRecord: (id) ->
     @_storeGet id, (fluxRecord) =>
       if fluxRecord.status == 200
         a = {}
@@ -178,15 +187,19 @@ module.exports = class ParseDbModel extends FluxDbModel
       , =>
         log "#{@name}: updating: #{parseData.id} (failure)"
 
-  _postProcessGet: (fluxRecord) ->
-    # @_updateParseRecord fluxRecord.parseData
-    fluxRecord
-
   _storeGet:  (id, callback) ->
-    @newQuery.get id, parseCallbackHandlers null, (fluxRecord) =>
-      # if fluxRecord.status == 200
-      #   log "#{@name}.get #{id} (success)"
-      callback if fluxRecord.status == 200 then @_postProcessGet fluxRecord else fluxRecord
+    @newQuery.get id, @_parseCallbackHandlers null, (fluxRecord) =>
+      # log "#{@name}.get #{id} (success)" if fluxRecord.status == 200
+
+      callback if fluxRecord.status == 200
+        {data} = fluxRecord
+        newData = @postProcessRecord data
+        if data != newData
+          merge fluxRecord, data:newData
+        else
+          fluxRecord
+      else
+        fluxRecord
       null
     status: "pending"
 
@@ -196,7 +209,7 @@ module.exports = class ParseDbModel extends FluxDbModel
     @getOrLoad id, (fluxRecord) =>
       switch fluxRecord.status
         when "pending" then null # wait, FluxRecord.get will send a "pending" to the client callback
-        when 200       then fluxRecord.parseData.destroy parseCallbackHandlers null, callback
+        when 200       then fluxRecord.parseData.destroy @_parseCallbackHandlers null, callback
         else                callback fluxRecord
       null
     null
@@ -207,8 +220,72 @@ module.exports = class ParseDbModel extends FluxDbModel
     null
 
   #####################
-  # OVERRIDES
+  # PARSE ADAPTERS
   #####################
+
+  _parseCallbackHandlers: (pendingData, callback) ->
+
+    success: (parseData) =>
+      # log parseCallbackHandlers:success:pendingData:pendingData
+      callback? @_parseToFluxRecord parseData
+
+    error: =>
+      # log parseCallbackHandlers:error:pendingData:pendingData,status: parseErrorToStatusCode error
+      error = peek arguments # last argument
+      fluxRecord =
+        status: parseErrorToStatusCode error
+        parseError: error
+        errorMessage: error.message
+      fluxRecord.pendingData = pendingData if pendingData
+      callback? fluxRecord
+
+  # Note: This probably works fine, but attributes is not part of the Officially Parse API...
+  _parseObjectToPlainObject: (parseObject, recursionBlock = {}) ->
+    key = parseObject.className + parseObject.id
+
+    ###
+    We could return the already-converted object and exactly represent the parseObject data structure,
+    BUT, that would result in a data structure with circular references that toJSON won't work on.
+    Parse used to return non-circular data structures, but they don't anymore (as of 1.6.2)
+    So, we just return null.
+    In many cases, the FluxStore will already have this data stored anyway, so won't have to go out to Parse to fetch it.
+    ###
+    return null if recursionBlock[key]
+    recursionBlock[key] = true
+
+    plainObject =
+      id: parseObject.id
+      createdAt: parseObject.createdAt
+      updatedAt: parseObject.updatedAt
+
+    for k, v of parseObject.attributes
+      plainObject[k] = if v instanceof Parse.Object
+        self.lastParseObject = v
+        plainObject[k + "Id"] = v.id
+        if !v.createdAt
+          null
+        else
+          modelName = ParseDbModel.parseClassNameToModelName[v.className]
+          @models[modelName]._parseObjectToPlainObject v, recursionBlock
+      else
+        v
+
+    recursionBlock[key] = false
+
+    @postProcessRecord plainObject
+
+  _parseToPlainObject: (parseData) ->
+    if parseData
+      if isArray parseData
+        @_parseObjectToPlainObject el for el in parseData
+      else
+        @_parseObjectToPlainObject parseData
+
+  _parseToFluxRecord: (parseData) ->
+    parseData &&
+      data: @_parseToPlainObject parseData
+      parseData: parseData
+      status: 200
 
   @getter
     specialCaseFields: ->
@@ -250,4 +327,4 @@ module.exports = class ParseDbModel extends FluxDbModel
 
   _saveParseObject: (fields, callback) ->
     parseObject = @_fieldsToParseObject fields
-    parseObject.save null, parseCallbackHandlers fields, callback
+    parseObject.save null, @_parseCallbackHandlers fields, callback

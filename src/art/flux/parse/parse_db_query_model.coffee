@@ -54,5 +54,5 @@ module.exports = class ParseDbQueryModel extends FluxDbQueryModel
           callback fluxRecord
       else callback
 
-      query.find parseCallbackHandlers null, _callback
+      query.find @_singlesModel._parseCallbackHandlers null, _callback
     null

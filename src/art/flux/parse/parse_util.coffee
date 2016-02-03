@@ -1,7 +1,9 @@
+Foundation = require 'art-foundation'
+Parse = require 'parse'
+
 {
   BaseObject, log, peek, isArray, objectWithout
-} = require 'art-foundation'
-Parse = require 'parse'
+} = Foundation
 
 # NOTE: To use this model, be sure to include the Parse client library such that "Parse" available globally.
 module.exports = class ParseUtil extends BaseObject
@@ -75,77 +77,4 @@ module.exports = class ParseUtil extends BaseObject
       when Parse.Error.REQUEST_LIMIT_EXCEEDED           then 504 # Service Unavailable
 
       else 500
-
-  @saveParseObject: (parseObject, fields, callback) ->
-    fields = objectWithout fields, "id", "createdAt", "updatedAt" # strip "id" if present
-    parseObject.save fields, parseCallbackHandlers fields, callback
-
-  # Note: The Parse.Query error handler appear to differ from single-object handlers:
-  #   queries: (error) ->
-  #   singles: (object, error) ->
-  # SBD: current solution: assume the last argument is the error object.
-  # SBD: alt solution: for a in arguments; error = a if isNumber(a.code) && isString(a.message)
-  @parseCallbackHandlers: parseCallbackHandlers = (pendingData, callback) ->
-
-    success: (parseData) =>
-      # log parseCallbackHandlers:success:pendingData:pendingData
-      callback? parseToFluxRecord parseData
-    error: =>
-      # log parseCallbackHandlers:error:pendingData:pendingData,status: parseErrorToStatusCode error
-      error = peek arguments # last argument
-      fluxRecord =
-        status: parseErrorToStatusCode error
-        parseError: error
-        errorMessage: error.message
-      fluxRecord.pendingData = pendingData if pendingData
-      callback? fluxRecord
-
-  @parseObjectToPlainObject: parseObjectToPlainObject = (parseObject, recursionBlock = {}) ->
-    key = parseObject.className + parseObject.id
-
-    # we could return the already-converted object and exactly represent the parseObject data structure,
-    # BUT, that would result in a data structure with circular references that toJSON won't work on.
-    # Parse used to return non-circular data structures, but they don't anymore (as of 1.6.2)
-    # So, we just return null.
-    # In many cases, the FluxStore will already have this data stored anyway, so won't have to go out to Parse to fetch it.
-    return null if recursionBlock[key]
-    recursionBlock[key] = true
-
-    plainObject =
-      id: parseObject.id
-      createdAt: parseObject.createdAt
-      updatedAt: parseObject.updatedAt
-
-    for k, v of parseObject.attributes
-      plainObject[k] = if v instanceof Parse.Object
-        plainObject[k + "Id"] = v.id
-        if !v.createdAt
-          # log notFetched:
-          #   id: v.id
-          #   createdAt: v.createdAt
-          #   updatedAt: v.updatedAt
-          # this happens when Parse hasn't actually fetched the object yet
-          null
-        else
-          parseObjectToPlainObject v, recursionBlock
-      else
-        v
-
-    recursionBlock[key] = false
-
-    plainObject
-
-  # Note: This probably works fine, but attributes is part of the Officially Parse API...
-  @parseToPlainObject: parseToPlainObject = (parseData) ->
-    if parseData
-      if isArray parseData
-        parseObjectToPlainObject el for el in parseData
-      else
-        parseObjectToPlainObject parseData
-
-  @parseToFluxRecord: parseToFluxRecord = (parseData) ->
-    parseData &&
-      data: parseToPlainObject parseData
-      parseData: parseData
-      status: 200
 
