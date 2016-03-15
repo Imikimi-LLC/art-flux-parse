@@ -2,9 +2,12 @@
   nextTick, BaseObject, log, merge
   isString, isArray
   flatten, compact
+  compactFlatten
   consistentJsonStringify
   inspectLean
 } = require 'art-foundation'
+
+Parse = require 'parse'
 
 ParseDbModel = require './parse_db_model'
 ParseDbQueryModel = require './parse_db_query_model'
@@ -46,38 +49,41 @@ class PusherLink extends BaseObject
     @_model = model
     @_openPusherChannels = {}
     @_pusherChannelListeners = {}
+    @_subPusherLinks = []
 
-    # console.log @dependencyCode
+    console.log @dependencyCode
+
+  addSubPusherLink: (pl) -> @_subPusherLinks.push pl
 
   @getter
     dependencyCode: ->
       model = @_model
       "@addDependency " + inspectLean model:model.singlesModel.name, name: model.name, keyFromData: "(" + model.keyFromData.toString().replace(/\s+/g, " ") + ")"
 
-  fluxStoreEntryUpdated: ({key}) ->
+  fluxStoreEntryUpdated: ({key, subscribers}) ->
     return unless self.pusher
     return if @_openPusherChannels[key]
 
     channel = @getPusherChannel key
 
-    ParsePusherDbModel.activeSubscriptions[channel] = key
-    @_pusherChannelListeners[key] ||= => @_model.load key
-    @_openPusherChannels[key] = pusher.subscribe channel
-    # log "pusher.subscribe #{channel}"
-    @_openPusherChannels[key].bind pusherEventName, @_pusherChannelListeners[key]
+    if subscribers.length > 0
+      ParsePusherDbModel.activeSubscriptions[channel] = key
+      @_pusherChannelListeners[key] ||= => @_model.load key
+      @_openPusherChannels[key] = pusher.subscribe channel
+      @_openPusherChannels[key].bind pusherEventName, @_pusherChannelListeners[key]
 
   fluxStoreEntryRemoved: ({key}) ->
     return unless self.pusher
     return unless @_openPusherChannels[key]
 
-    channel = @getPusherChannel key
+    if @_openPusherChannels[key]
+      channel = @getPusherChannel key
 
-    delete ParsePusherDbModel.activeSubscriptions[channel]
-    pusher.unsubscribe channel
-    # log "pusher.unsubscribe #{channel}"
-    @_openPusherChannels[key].unbind pusherEventName, @_pusherChannelListeners[key]
-    delete @_openPusherChannels[key]
-    delete @_pusherChannelListeners[key]
+      delete ParsePusherDbModel.activeSubscriptions[channel]
+      pusher.unsubscribe channel
+      @_openPusherChannels[key].unbind pusherEventName, @_pusherChannelListeners[key]
+      delete @_openPusherChannels[key]
+      delete @_pusherChannelListeners[key]
 
   getPusherChannel: (key) ->
     if isString key
@@ -85,10 +91,16 @@ class PusherLink extends BaseObject
     else
       "#{@_model.name}__#{consistentJsonStringify(key).replace(/:/g, '-').replace(/[ {}\[\]""]/g, '')}"
 
+  getPusherUpdates: (data) ->
+    compactFlatten [
+      @getPusherChannel @_model.keyFromData data
+      link.getPusherUpdates data for link in @_subPusherLinks
+    ]
+
 class ParsePusherDbQueryModel extends ParseDbQueryModel
   constructor: ->
     super
-    @_pusherLink = new PusherLink @
+    @_singlesModel._pusherLink.addSubPusherLink @_pusherLink = new PusherLink @
 
   fluxStoreEntryUpdated: (entry) -> @_pusherLink?.fluxStoreEntryUpdated entry
   fluxStoreEntryRemoved: (entry) -> @_pusherLink?.fluxStoreEntryRemoved entry
@@ -103,3 +115,14 @@ module.exports = class ParsePusherDbModel extends ParseDbModel
 
   fluxStoreEntryUpdated: (entry) -> @_pusherLink?.fluxStoreEntryUpdated entry
   fluxStoreEntryRemoved: (entry) -> @_pusherLink?.fluxStoreEntryRemoved entry
+
+  _sendPusherChangesFor: (data) ->
+    Parse.Cloud.run "pusherChanges", pusherChanges: @_pusherLink.getPusherUpdates data
+
+  put: ->
+    super
+    .then (data) => @_sendPusherChangesFor data
+
+  post: ->
+    super
+    .then (data) => @_sendPusherChangesFor data
