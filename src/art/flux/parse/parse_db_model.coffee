@@ -328,3 +328,11 @@ module.exports = class ParseDbModel extends FluxDbModel
   _saveParseObject: (fields, callback) ->
     parseObject = @_fieldsToParseObject fields
     parseObject.save null, @_parseCallbackHandlers fields, callback
+
+  _saveParseObjectPromise: (parseObject) ->
+    parseObject.save null
+    .then (parseData) =>
+      @_parseToFluxRecord(parseData).data
+    , ->
+      console.error "_saveParseObject", arguments
+

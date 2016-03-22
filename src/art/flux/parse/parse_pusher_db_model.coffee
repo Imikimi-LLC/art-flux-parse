@@ -118,6 +118,12 @@ module.exports = class ParsePusherDbModel extends ParseDbModel
 
   _sendPusherChangesFor: (data) ->
     Parse.Cloud.run "pusherChanges", pusherChanges: @_pusherLink.getPusherUpdates data
+    data
+
+  _saveParseObjectPromise: ->
+    super
+    .then (data) =>
+      @_sendPusherChangesFor data
 
   put: ->
     super
