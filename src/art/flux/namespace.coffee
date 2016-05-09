@@ -3,8 +3,5 @@
 
 Art = require '../namespace'
 module.exports = Art.Flux ||
-class Art.Flux extends Neptune.Base
-  @namespace: Art
-  @namespacePath: "Neptune.Art.Flux"
-
-Art.addNamespace Art.Flux
+Art.addNamespace class Flux extends Neptune.Base
+  ;

@@ -3,8 +3,5 @@
 
 Flux = require '../namespace'
 module.exports = Flux.Parse ||
-class Flux.Parse extends Neptune.Base
-  @namespace: Flux
-  @namespacePath: "Neptune.Art.Flux.Parse"
-
-Flux.addNamespace Flux.Parse
+Flux.addNamespace class Parse extends Neptune.Base
+  ;
