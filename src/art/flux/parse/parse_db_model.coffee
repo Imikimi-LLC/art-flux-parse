@@ -5,9 +5,10 @@
 Parse = require 'parse'
 
 Flux = require './flux'
+{success, pending, failure, missing} = Flux
 {FluxDbModel} = Flux.Db
 
-{parseErrorToStatusCode} = require './parse_util'
+{parseErrorToFluxStatus} = require './parse_util'
 ParseDbQueryModel = require './parse_db_query_model'
 
 ###
@@ -62,8 +63,8 @@ module.exports = class ParseDbModel extends FluxDbModel
     super id, fields, (fluxRecord) ->
       callback? fluxRecord
       switch fluxRecord.status
-        when "pending" then
-        when 200 then promise.resolve fluxRecord.data
+        when pending then
+        when success then promise.resolve fluxRecord.data
         else promise.reject fluxRecord
 
     promise
@@ -75,8 +76,8 @@ module.exports = class ParseDbModel extends FluxDbModel
     super fields, (fluxRecord) ->
       callback? fluxRecord
       switch fluxRecord.status
-        when "pending" then
-        when 200 then promise.resolve fluxRecord.data
+        when pending then
+        when success then promise.resolve fluxRecord.data
         else promise.reject fluxRecord
 
     promise
@@ -144,14 +145,14 @@ module.exports = class ParseDbModel extends FluxDbModel
         for result in results
           eachFunction result
         if results.length == batchSize
-          callback? status:"pending", processed:offset + results.length
+          callback? status: pending, processed:offset + results.length
 
           processBatch offset + batchSize
         else
-          callback? status:200, processed:offset + results.length
+          callback? status: success, processed:offset + results.length
 
       , (error) ->
-        callback? status:"error", error:error
+        callback? status: failure, error:error
         console.error "#{@name}#_eachRemoteRecord error: #{error.message}"
 
     processBatch 0
@@ -165,11 +166,11 @@ module.exports = class ParseDbModel extends FluxDbModel
   # used for debugging
   _logRecord: (id) ->
     @_storeGet id, (fluxRecord) =>
-      if fluxRecord.status == 200
+      if fluxRecord.status == success
         a = {}
         a[@_name] = id:id, record:fluxRecord.data
         log a
-      else if fluxRecord.status != "pending"
+      else if fluxRecord.status != pending
         console.log "#{@name}: Error: id:#{id}", fluxRecord
 
   _updateParseRecord: (parseData) ->
@@ -189,9 +190,9 @@ module.exports = class ParseDbModel extends FluxDbModel
 
   _storeGet:  (id, callback) ->
     @newQuery.get id, @_parseCallbackHandlers null, (fluxRecord) =>
-      # log "#{@name}.get #{id} (success)" if fluxRecord.status == 200
+      # log "#{@name}.get #{id} (success)" if fluxRecord.status == success
 
-      callback if fluxRecord.status == 200
+      callback if fluxRecord.status == success
         {data} = fluxRecord
         newData = @postProcessRecord data
         if data != newData
@@ -201,15 +202,15 @@ module.exports = class ParseDbModel extends FluxDbModel
       else
         fluxRecord
       null
-    status: "pending"
+    status: pending
 
   _storePost: (fields, callback) -> @_saveParseObject fields, callback
 
   _storeDelete: (id, callback) ->
     @getOrLoad id, (fluxRecord) =>
       switch fluxRecord.status
-        when "pending" then null # wait, FluxRecord.get will send a "pending" to the client callback
-        when 200       then fluxRecord.parseData.destroy @_parseCallbackHandlers null, callback
+        when pending then null # wait, FluxRecord.get will send a pending to the client callback
+        when success       then fluxRecord.parseData.destroy @_parseCallbackHandlers null, callback
         else                callback fluxRecord
       null
     null
@@ -230,10 +231,10 @@ module.exports = class ParseDbModel extends FluxDbModel
       callback? @_parseToFluxRecord parseData
 
     error: =>
-      # log parseCallbackHandlers:error:pendingData:pendingData,status: parseErrorToStatusCode error
+      # log parseCallbackHandlers:error:pendingData:pendingData,status: parseErrorToFluxStatus error
       error = peek arguments # last argument
       fluxRecord =
-        status: parseErrorToStatusCode error
+        status: parseErrorToFluxStatus error
         parseError: error
         errorMessage: error.message
       fluxRecord.pendingData = pendingData if pendingData
@@ -285,7 +286,7 @@ module.exports = class ParseDbModel extends FluxDbModel
     parseData &&
       data: @_parseToPlainObject parseData
       parseData: parseData
-      status: 200
+      status: success
 
   @getter
     specialCaseFields: ->
