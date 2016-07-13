@@ -1,6 +1,6 @@
 {
   "name": "art-flux-parse",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "art-flux-parse",
   "main": "index.coffee",
   "dependencies": {
@@ -8,8 +8,7 @@
     "parse": "^1.6.14",
     "pusher": "^1.1.0"
   },
-  "devDependencies": {
-  },
+  "devDependencies": {},
   "scripts": {
     "test": "webpack-dev-server -d"
   },
