@@ -10,7 +10,7 @@ Facebook Parse shut down 1/30/2017. Though you can run the parse code on your cl
 
 # ArtEry
 
-An so, we invented ArtEry, a backend and hosting agnostic zero-server-code framework. We are currently using Heroku for hosting and DynamoDb for the backend.
+And so, we invented ArtEry, a hosting, database, security-policy agnostic "100% Client-Side Cloud-Code Development" framework.
 
 Learn more:
 
